@@ -19,10 +19,11 @@ import { useDuration } from './hooks/use-duration';
 import { useManifestFromUrl } from './hooks/use-manifest-from-url';
 import { Test } from './components/test';
 
-const CanvasLabel: React.FC<{ start: number; end: number }> = ({
-  start,
-  end,
-}) => {
+const CanvasLabel: React.FC<{
+  start: number;
+  end: number;
+  noNav?: boolean;
+}> = ({ start, end, noNav }) => {
   const manifestDuration = useDuration();
   const canvas = useCanvas();
   const index = useCanvasIndex(canvas.id);
@@ -49,7 +50,7 @@ const CanvasLabel: React.FC<{ start: number; end: number }> = ({
         <div
           style={{
             height: 20,
-            background: 'blue',
+            background: '#999',
             position: 'absolute',
             left: `${(canvasOffsetDuration / manifestDuration) * 100}%`,
             width: `${(canvas.duration / manifestDuration) * 100}%`,
@@ -58,7 +59,7 @@ const CanvasLabel: React.FC<{ start: number; end: number }> = ({
         <div
           style={{
             height: 20,
-            background: 'red',
+            background: noNav ? 'orange' : 'green',
             position: 'absolute',
             left: `${durationStart * 100}%`,
             width: `${durationWidth * 100}%`,
@@ -70,10 +71,15 @@ const CanvasLabel: React.FC<{ start: number; end: number }> = ({
   );
 };
 
-const RangeLabel: React.FC<{ id: string }> = ({ id }) => {
+const RangeLabel: React.FC<{ id: string; noNav?: boolean }> = ({
+  id,
+  noNav: parentNoNav,
+}) => {
   const range = useFromRef({ type: 'Range', id });
 
   if (!range) return null;
+
+  const noNav = parentNoNav || range.behavior.indexOf('no-nav') !== -1;
 
   // @ts-ignore
   if (range.type === 'Canvas') {
@@ -81,16 +87,24 @@ const RangeLabel: React.FC<{ id: string }> = ({ id }) => {
     const [, canvasId, start, end] = range.id.match(
       /(.*)#t=([0-9.]+),?([0-9.]+)?/
     );
+    console.log('ctx', range);
     return (
-      <Context context={canvasContext(canvasId)}>
-        <CanvasLabel start={parseFloat(start)} end={parseFloat(end)} />
+      <Context context={canvasContext(canvasId ? canvasId : range.id)}>
+        <CanvasLabel
+          start={parseFloat(start)}
+          end={parseFloat(end)}
+          noNav={noNav}
+        />
       </Context>
     );
   }
 
-  if (range?.behavior.indexOf('no-nav') !== -1) {
-    return <span>'No nav'</span>;
-  }
+  // if (range?.behavior.indexOf('no-nav') !== -1) {
+  //   return <div>
+  //     No nav
+  //     <CanvasLabel start={parseFloat(start)} end={parseFloat(end)} />
+  //   </div>;
+  // }
 
   return (
     <div>
@@ -102,7 +116,12 @@ const RangeLabel: React.FC<{ id: string }> = ({ id }) => {
       <ul style={{ marginBottom: 10 }}>
         {(range.items || []).map(rangeItem => (
           <li>
-            <RangeLabel key={rangeItem.id} id={rangeItem.id} />
+            {rangeItem.id ===
+            'http://api.bl.uk/metadata/iiif/#t=378.72,1520.04' ? (
+              'ERROR'
+            ) : (
+              <RangeLabel key={rangeItem.id} id={rangeItem.id} noNav={noNav} />
+            )}
           </li>
         ))}
       </ul>
