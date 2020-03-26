@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { render } from 'react-dom';
 import {
   Context,
   useCanvas,
   useExternalManifest,
   useManifest,
+  useVaultEffect,
   VaultProvider,
 } from '@hyperion-framework/react-vault';
 import {
@@ -18,6 +19,11 @@ import { useCanvasIndex } from './hooks/use-canvas-index';
 import { useDuration } from './hooks/use-duration';
 import { useManifestFromUrl } from './hooks/use-manifest-from-url';
 import { Test } from './components/test';
+import {
+  CanvasNormalized,
+  Range,
+  RangeNormalized,
+} from '@hyperion-framework/types';
 
 const CanvasLabel: React.FC<{
   start: number;
@@ -60,6 +66,79 @@ const CanvasLabel: React.FC<{
           style={{
             height: 20,
             background: noNav ? 'orange' : 'green',
+            position: 'absolute',
+            left: `${durationStart * 100}%`,
+            width: `${durationWidth * 100}%`,
+          }}
+        />
+      </div>
+      <div style={{ height: 20 }} />
+    </div>
+  );
+};
+
+const ParentRangeTest: React.FC<{ id: string }> = ({ id }) => {
+  const [startTime, setStartTime] = useState<number>(0);
+  const [endTime, setEndTime] = useState<number>(0);
+
+  const manifestDuration = useDuration();
+  const manifest = useManifest();
+
+  const durationStart = startTime / manifestDuration;
+  const durationWidth = (endTime - startTime) / manifestDuration;
+
+  useVaultEffect(vault => {
+    const range = vault.fromRef<RangeNormalized>({ type: 'Range', id });
+    const _startTimes: number[] = [];
+    const _endTimes: number[] = [];
+
+    const parseRange = (inputRange: RangeNormalized) => {
+      for (const r of inputRange.items || []) {
+        const ro = vault.fromRef<RangeNormalized>({ type: 'Range', id: r.id });
+        if (ro && (ro.type as string) === 'Canvas') {
+          const [, canvasId, start, end] = ro.id.match(
+            /(.*)#t=([0-9.]+),?([0-9.]+)?/
+          );
+
+          let runningDuration = 0;
+          for (const canvasRef of manifest.items) {
+            const canvas = vault.fromRef<CanvasNormalized>(canvasRef);
+            if (canvasId && canvasId === canvas.id) {
+              break;
+            }
+            runningDuration += canvas.duration;
+          }
+
+          _startTimes.push(runningDuration + parseFloat(start));
+          _endTimes.push(runningDuration + parseFloat(end));
+        } else {
+          parseRange(ro);
+        }
+      }
+    };
+
+    parseRange(range);
+
+    setStartTime(Math.min(..._startTimes));
+    setEndTime(Math.max(..._endTimes));
+  });
+
+  return (
+    <div>
+      <div
+        style={{
+          width: '100%',
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          background: '#ddd',
+          height: 20,
+        }}
+      >
+        <div
+          style={{
+            height: 20,
+            background: 'blue',
             position: 'absolute',
             left: `${durationStart * 100}%`,
             width: `${durationWidth * 100}%`,
@@ -114,6 +193,9 @@ const RangeLabel: React.FC<{ id: string; noNav?: boolean }> = ({
         ? range.label.en[0]
         : 'Untitled range'}
       <ul style={{ marginBottom: 10 }}>
+        {range.items && range.items.length > 1 && (
+          <ParentRangeTest id={range.id} />
+        )}
         {(range.items || []).map(rangeItem => (
           <li>
             {rangeItem.id ===
