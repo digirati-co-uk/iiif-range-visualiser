@@ -101,91 +101,96 @@ const TimePlanComponent: React.FC = () => {
   const [timePlans, setTimePlans] = useState<TimePlan[]>([]);
   const [currentRange, setCurrentRange] = useContext(RangeContext);
 
-  useVaultEffect(vault => {
-    const parseRange = (
-      range: RangeNormalized,
-      rangeStack: string[] = [],
-      startDuration: number = 0
-    ): TimePlan => {
-      const timePlan: TimePlan = {
-        type: 'time-plan',
-        canvases: [],
-        duration: 0,
-        items: [],
-        stops: [],
-        end: 0,
-        start: startDuration,
-        rangeId: range.id,
-        rangeStack,
+  useVaultEffect(
+    vault => {
+      const parseRange = (
+        range: RangeNormalized,
+        rangeStack: string[] = [],
+        startDuration: number = 0
+      ): TimePlan => {
+        const timePlan: TimePlan = {
+          type: 'time-plan',
+          canvases: [],
+          duration: 0,
+          items: [],
+          stops: [],
+          end: 0,
+          start: startDuration,
+          rangeId: range.id,
+          rangeStack,
+        };
+
+        let runningDuration = startDuration;
+
+        for (
+          let canvasIndex = 0;
+          canvasIndex < range.items.length;
+          canvasIndex++
+        ) {
+          const ro = vault.fromRef<RangeNormalized>(range.items[canvasIndex]);
+
+          if (ro && (ro.type as string) === 'Canvas') {
+            const [, canvasId, start, end] = ro.id.match(
+              /(.*)#t=([0-9.]+),?([0-9.]+)?/
+            );
+
+            const canvas = vault.fromRef<CanvasNormalized>({
+              type: 'Canvas',
+              id: canvasId,
+            });
+
+            timePlan.canvases.push(canvas.id);
+
+            const rStart = parseFloat(start);
+            const rEnd = parseFloat(end);
+            const rDuration = rEnd - rStart;
+
+            runningDuration += rDuration;
+
+            const timeStop: TimeStop = {
+              type: 'time-stop',
+              canvasIndex,
+              start: runningDuration - rDuration,
+              end: runningDuration,
+              duration: rDuration,
+              rangeId: ro.id,
+              rangeStack,
+            };
+
+            timePlan.stops.push(timeStop);
+            timePlan.items.push(timeStop);
+          } else {
+            if (!ro.behavior || ro.behavior.indexOf('no-nav') === -1) {
+              const rangeTimePlan = parseRange(
+                ro,
+                [...rangeStack, ro.id],
+                runningDuration
+              );
+
+              runningDuration += rangeTimePlan.duration;
+
+              timePlan.stops.push(...rangeTimePlan.stops);
+              timePlan.items.push(rangeTimePlan);
+            }
+          }
+        }
+
+        timePlan.end = runningDuration;
+        timePlan.duration = timePlan.end - timePlan.start;
+
+        return timePlan;
       };
 
-      let runningDuration = startDuration;
-
-      for (
-        let canvasIndex = 0;
-        canvasIndex < range.items.length;
-        canvasIndex++
-      ) {
-        const ro = vault.fromRef<RangeNormalized>(range.items[canvasIndex]);
-
-        if (ro && (ro.type as string) === 'Canvas') {
-          const [, canvasId, start, end] = ro.id.match(
-            /(.*)#t=([0-9.]+),?([0-9.]+)?/
-          );
-
-          const canvas = vault.fromRef<CanvasNormalized>({
-            type: 'Canvas',
-            id: canvasId,
-          });
-
-          timePlan.canvases.push(canvas.id);
-
-          const rStart = parseFloat(start);
-          const rEnd = parseFloat(end);
-          const rDuration = rEnd - rStart;
-
-          runningDuration += rDuration;
-
-          const timeStop: TimeStop = {
-            type: 'time-stop',
-            canvasIndex,
-            start: runningDuration - rDuration,
-            end: runningDuration,
-            duration: rDuration,
-            rangeId: ro.id,
-            rangeStack,
-          };
-
-          timePlan.stops.push(timeStop);
-          timePlan.items.push(timeStop);
-        } else {
-          const rangeTimePlan = parseRange(
-            ro,
-            [...rangeStack, ro.id],
-            runningDuration
-          );
-
-          runningDuration += rangeTimePlan.duration;
-
-          timePlan.stops.push(...rangeTimePlan.stops);
-          timePlan.items.push(rangeTimePlan);
-        }
+      const plans: TimePlan[] = [];
+      for (const rangeRef of manifest.structures) {
+        const range = vault.fromRef<RangeNormalized>(rangeRef);
+        const rangeTimePlan = parseRange(range, [range.id]);
+        plans.push(rangeTimePlan);
       }
-
-      timePlan.end = runningDuration;
-      timePlan.duration = timePlan.end - timePlan.start;
-
-      return timePlan;
-    };
-
-    const plans: TimePlan[] = [];
-    for (const rangeRef of manifest.structures) {
-      const range = vault.fromRef<RangeNormalized>(rangeRef);
-      const rangeTimePlan = parseRange(range, [range.id]);
-      plans.push(rangeTimePlan);
-    }
-    setTimePlans(plans);
-  }, [manifest]);
+      setTimePlans(plans);
+    },
+    [manifest]
+  );
 
   return (
     <div>
