@@ -83,8 +83,11 @@ const CanvasLabel: React.FC<{
         <div
           style={{
             height: 20,
-            background:
-              currentRange === rangeId ? 'purple' : noNav ? 'orange' : 'green',
+            background: noNav
+              ? 'orange'
+              : currentRange === rangeId
+              ? 'purple'
+              : 'green',
             position: 'absolute',
             left: `${durationStart * 100}%`,
             width: `${durationWidth * 100}%`,
