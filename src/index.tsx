@@ -1,4 +1,4 @@
-import React, {useContext, useRef, useState} from 'react';
+import React, { useContext, useRef, useState } from 'react';
 import { render } from 'react-dom';
 import {
   Context,
@@ -83,7 +83,8 @@ const CanvasLabel: React.FC<{
         <div
           style={{
             height: 20,
-            background: currentRange === rangeId ? 'purple' : noNav ? 'orange' : 'green',
+            background:
+              currentRange === rangeId ? 'purple' : noNav ? 'orange' : 'green',
             position: 'absolute',
             left: `${durationStart * 100}%`,
             width: `${durationWidth * 100}%`,
@@ -99,7 +100,6 @@ const TimePlanComponent: React.FC = () => {
   const manifest = useManifest();
   const [timePlans, setTimePlans] = useState<TimePlan[]>([]);
   const [currentRange, setCurrentRange] = useContext(RangeContext);
-
 
   useVaultEffect(vault => {
     const parseRange = (
@@ -185,7 +185,7 @@ const TimePlanComponent: React.FC = () => {
       plans.push(rangeTimePlan);
     }
     setTimePlans(plans);
-  });
+  }, [manifest]);
 
   return (
     <div>
