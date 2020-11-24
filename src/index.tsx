@@ -144,6 +144,10 @@ const TimePlanComponent: React.FC = () => {
               id: canvasId,
             });
 
+            if (!canvas) {
+              continue;
+            }
+
             timePlan.canvases.push(canvas.id);
 
             const rStart = parseFloat(start);
@@ -324,6 +328,11 @@ const RangeLabel: React.FC<{ id: string; noNav?: boolean; rid: string }> = ({
     const [, canvasId, start, end] = range.id.match(
       /(.*)#t=([0-9.]+),?([0-9.]+)?/
     );
+
+    if (canvasId === 'https://api.bl.uk/metadata/iiif/') {
+      return null;
+    }
+
     return (
       <Context context={canvasContext(canvasId ? canvasId : range.id)}>
         <CanvasLabel
