@@ -31,8 +31,9 @@ const CanvasLabel: React.FC<{
   start: number;
   end: number;
   rangeId?: string;
+  rid?: string;
   noNav?: boolean;
-}> = ({ start, end, rangeId, noNav }) => {
+}> = ({ start, end, rangeId, rid, noNav }) => {
   const manifestDuration = useDuration();
   const canvas = useCanvas();
   const index = useCanvasIndex(canvas.id);
@@ -83,10 +84,11 @@ const CanvasLabel: React.FC<{
         <div
           style={{
             height: 20,
-            background: noNav
+            background:
+              (currentRange === rangeId || currentRange === rid)
+            ? 'purple'
+              : noNav
               ? 'orange'
-              : currentRange === rangeId
-              ? 'purple'
               : 'green',
             position: 'absolute',
             left: `${durationStart * 100}%`,
@@ -157,13 +159,14 @@ const TimePlanComponent: React.FC = () => {
               end: runningDuration,
               duration: rDuration,
               rangeId: ro.id,
+              realRange: range.id,
               rangeStack,
             };
 
             timePlan.stops.push(timeStop);
             timePlan.items.push(timeStop);
           } else {
-            if (!ro.behavior || ro.behavior.indexOf('no-nav') === -1) {
+            // if (!ro.behavior || ro.behavior.indexOf('no-nav') === -1) {
               const rangeTimePlan = parseRange(
                 ro,
                 [...rangeStack, ro.id],
@@ -174,7 +177,7 @@ const TimePlanComponent: React.FC = () => {
 
               timePlan.stops.push(...rangeTimePlan.stops);
               timePlan.items.push(rangeTimePlan);
-            }
+            // }
           }
         }
 
@@ -214,8 +217,9 @@ const TimePlanComponent: React.FC = () => {
           {plan.stops.map(stop => (
             <div
               className="test"
-              onMouseEnter={() => setCurrentRange(stop.rangeId)}
+              onMouseEnter={() => setCurrentRange(stop.realRange)}
               style={{
+                background: stop.realRange === currentRange ? 'red' : undefined,
                 height: 20,
                 position: 'absolute',
                 left: `${(stop.start / plan.duration) * 100}%`,
@@ -247,6 +251,7 @@ const ParentRangeTest: React.FC<{ id: string }> = ({ id }) => {
     const parseRange = (inputRange: RangeNormalized) => {
       for (const r of inputRange.items || []) {
         const ro = vault.fromRef<RangeNormalized>({ type: 'Range', id: r.id });
+        console.log({ r, ro });
         if (ro && (ro.type as string) === 'Canvas') {
           const [, canvasId, start, end] = ro.id.match(
             /(.*)#t=([0-9.]+),?([0-9.]+)?/
@@ -302,9 +307,10 @@ const ParentRangeTest: React.FC<{ id: string }> = ({ id }) => {
   );
 };
 
-const RangeLabel: React.FC<{ id: string; noNav?: boolean }> = ({
+const RangeLabel: React.FC<{ id: string; noNav?: boolean; rid: string }> = ({
   id,
   noNav: parentNoNav,
+  rid,
 }) => {
   const range = useFromRef({ type: 'Range', id });
 
@@ -322,6 +328,7 @@ const RangeLabel: React.FC<{ id: string; noNav?: boolean }> = ({
       <Context context={canvasContext(canvasId ? canvasId : range.id)}>
         <CanvasLabel
           rangeId={range.id}
+          rid={rid}
           start={parseFloat(start)}
           end={parseFloat(end)}
           noNav={noNav}
@@ -354,7 +361,7 @@ const RangeLabel: React.FC<{ id: string; noNav?: boolean }> = ({
             'http://api.bl.uk/metadata/iiif/#t=378.72,1520.04' ? (
               'ERROR'
             ) : (
-              <RangeLabel key={rangeItem.id} id={rangeItem.id} noNav={noNav} />
+              <RangeLabel key={rangeItem.id} id={rangeItem.id} rid={range.id} noNav={noNav} />
             )}
           </li>
         ))}
@@ -385,6 +392,41 @@ const RangeContext = React.createContext<[string, (r: string) => void]>(
   undefined as any
 );
 
+const RangeTreeItem: React.FC<any> = ({id}) => {
+  const range = useFromRef({ type: 'Range', id });
+  const [currentRange, setCurrentRange] = useContext(RangeContext);
+
+  console.log(currentRange);
+
+  if (!range || !range.label) {
+    return null;
+  }
+
+
+
+  return <li style={{ color: currentRange === range.id ? 'red' : 'black' }}>
+    <span onClick={() => setCurrentRange(range.id)}>{range.label ? range.label.en[0] : 'Untitled'}</span>
+    <ul>
+      {range.items.map(ref => {
+        return <RangeTreeItem key={ref.id} id={ref.id} />
+      })}
+    </ul>
+
+  </li>
+}
+
+const RangeTree: React.FC<{id?: string}> = ({id}) => {
+  const manifest = useManifest();
+  const duration = useDuration();
+  return (
+    <div>
+      {manifest.structures.map(s => (
+        <RangeTreeItem key={s.id} id={s.id} />
+      ))}
+    </div>
+  );
+}
+
 export const Ranges: React.FC = () => {
   const inputId = useManifestFromUrl();
   const { id, isLoaded } = useExternalManifest(inputId);
@@ -399,7 +441,12 @@ export const Ranges: React.FC = () => {
       <Context
         context={combineContext(manifestContext(id), thumbnailSizeContext({}))}
       >
-        <TimePlanComponent />
+        <div style={{ display: 'flex', flexDirection: 'row' }}>
+          <RangeTree id={inputId} />
+          <div style={{ width: '100%', justifySelf: 'flex-end' }}>
+            <TimePlanComponent />
+          </div>
+        </div>
         <RangeView id={inputId} />
       </Context>
     </RangeContext.Provider>

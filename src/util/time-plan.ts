@@ -5,6 +5,7 @@ export type TimeStop = {
   end: number;
   duration: number;
   rangeId: string;
+  realRange: string;
   rangeStack: string[];
 };
 
